@@ -1,16 +1,22 @@
+"""
+Refactored main window using pages structure
+"""
+
 import os
 from PySide6.QtWidgets import QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QLabel, QStackedWidget, QMessageBox
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QFont, QIcon
 
 from src.core import DatabaseManager
-from src.ui.buttons import IconTextButton
-from src.modes import DeckManager, StudyMode, StatsWidget
 from src.core.paths import asset_path
-from src.animation import AnimatedIconLabel, AnimatedWelcomeBanner, SwordTomatoAnim, show_logo_popup
+from src.pages import HomePage, StudyPage, DecksPage, TimerPage, StatsPage
+from src.animation import AnimatedIconLabel, show_logo_popup
+from src.ui.buttons import PrimaryButton
 
 
 class DoroLexusApp(QMainWindow):
+    """Main application window with pages structure"""
+    
     def __init__(self):
         super().__init__()
         self.db_manager = DatabaseManager()
@@ -19,36 +25,65 @@ class DoroLexusApp(QMainWindow):
         self.setup_connections()
 
     def init_ui(self):
+        """Initialize the main UI"""
         self.setWindowTitle("DoroLexus - Vocabulary Flashcard App")
         self.setGeometry(100, 100, 1000, 700)
         self.setMinimumSize(800, 600)
 
+        # Set window icon
         icon_path = asset_path("data", "images", "svg", "doro_lexus logo.svg")
         if icon_path:
             self.setWindowIcon(QIcon(icon_path))
 
-        self.setAttribute(Qt.WA_TranslucentBackground, True)
-        self.setWindowOpacity(0.96)
-        self.apply_dark_theme()
+        # Window properties - removed translucent background to fix overlay issue
+        # self.setAttribute(Qt.WA_TranslucentBackground, True)
+        # self.setWindowOpacity(0.96)
+        self.apply_theme()
 
+        # Main widget and layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
 
-        self.create_header(main_layout)
+        # Header
+        self.header_widget = self.create_header(main_layout)
 
+        # Stacked widget for pages
         self.stacked_widget = QStackedWidget()
         main_layout.addWidget(self.stacked_widget)
 
-        self.init_views()
-        self.stacked_widget.setCurrentWidget(self.main_menu)
-        # Pop-up logo quick reveal on startup
+        # Initialize pages
+        self.init_pages()
+        
+        # Start with home page and hide header for home
+        self.stacked_widget.setCurrentWidget(self.home_page)
+        if self.header_widget:
+            self.header_widget.setVisible(False)
+        
+        # Show logo popup on startup
         if icon_path:
             show_logo_popup(self, icon_path, size=96, lifespan_ms=900)
 
     def create_header(self, layout):
-        header_layout = QHBoxLayout()
+        """Create the header section"""
+        header_widget = QWidget()
+        header_widget.setFixedHeight(80)
+        header_widget.setStyleSheet("""
+            QWidget {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 rgba(31, 111, 235, 0.1),
+                    stop:1 rgba(18, 18, 18, 0.95));
+                border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+            }
+        """)
+        
+        header_layout = QHBoxLayout(header_widget)
+        header_layout.setContentsMargins(20, 10, 20, 10)
+        header_layout.setSpacing(15)
 
+        # Logo
         logo_path = asset_path("data", "images", "svg", "doro_lexus logo.svg")
         if logo_path:
             logo_widget = AnimatedIconLabel(logo_path, size=48)
@@ -56,112 +91,82 @@ class DoroLexusApp(QMainWindow):
             logo_widget.clicked.connect(lambda: show_logo_popup(self, logo_path, size=120, lifespan_ms=1000))
             header_layout.addWidget(logo_widget)
 
+        # Title
         title_label = QLabel("DoroLexus")
         title_font = QFont()
         title_font.setPointSize(24)
         title_font.setBold(True)
+        title_font.setFamily("Arial")
         title_label.setFont(title_font)
-        title_label.setStyleSheet("color: #E0E0E0; margin: 10px 0px 10px 10px;")
-
+        title_label.setStyleSheet("""
+            QLabel {
+                color: #E0E0E0;
+                background: transparent;
+                margin: 10px 0px 10px 10px;
+            }
+        """)
         header_layout.addWidget(title_label)
         header_layout.addStretch()
 
-        self.back_button = QPushButton("← Back")
-        self.back_button.clicked.connect(self.show_main_menu)
+        # Back button
+        self.back_button = PrimaryButton("← Back")
+        self.back_button.setFixedSize(100, 40)
+        self.back_button.clicked.connect(self.show_home)
         self.back_button.setVisible(False)
-
         header_layout.addWidget(self.back_button)
-        layout.addLayout(header_layout)
 
-    def init_views(self):
-        self.main_menu = self.create_main_menu()
-        self.stacked_widget.addWidget(self.main_menu)
+        layout.addWidget(header_widget)
+        return header_widget
 
-        self.deck_manager = DeckManager(self.db_manager)
-        self.stacked_widget.addWidget(self.deck_manager)
+    def init_pages(self):
+        """Initialize all pages"""
+        # Home page
+        self.home_page = HomePage()
+        self.stacked_widget.addWidget(self.home_page)
 
-        self.study_mode = StudyMode(self.db_manager)
-        self.stacked_widget.addWidget(self.study_mode)
+        # Study page
+        self.study_page = StudyPage(self.db_manager)
+        self.stacked_widget.addWidget(self.study_page)
 
-        self.stats_widget = StatsWidget(self.db_manager)
-        self.stacked_widget.addWidget(self.stats_widget)
+        # Decks page
+        self.decks_page = DecksPage(self.db_manager)
+        self.stacked_widget.addWidget(self.decks_page)
 
-    def create_main_menu(self):
-        menu_widget = QWidget()
-        layout = QVBoxLayout(menu_widget)
-        layout.setSpacing(20)
-        layout.setContentsMargins(50, 50, 50, 50)
+        # Timer page
+        self.timer_page = TimerPage()
+        self.stacked_widget.addWidget(self.timer_page)
 
-        banner = AnimatedWelcomeBanner("Welcome to DoroLexus!")
-        layout.addWidget(banner)
-        banner.play()
+        # Stats page
+        self.stats_page = StatsPage(self.db_manager)
+        self.stacked_widget.addWidget(self.stats_page)
 
-        buttons_layout = QVBoxLayout()
-        buttons_layout.setSpacing(15)
+    def setup_connections(self):
+        """Setup signal connections between pages"""
+        # Home page connections
+        self.home_page.study_requested.connect(self.show_study)
+        self.home_page.decks_requested.connect(self.show_decks)
+        self.home_page.timer_requested.connect(self.show_timer)
+        self.home_page.stats_requested.connect(self.show_stats)
+        self.home_page.exit_requested.connect(self.close)
+        
+        # Decks page connections
+        self.decks_page.deck_selected.connect(self.on_deck_selected)
 
-        sword_icon_path = asset_path("data", "images", "svg", "sword-svgrepo-com.svg") or ""
-        study_btn = IconTextButton("Study Flashcards", sword_icon_path)
-        study_btn.setMinimumHeight(50)
-        study_btn.clicked.connect(self.start_study)
-        buttons_layout.addWidget(study_btn)
-
-        tomato_icon_path = asset_path("data", "images", "svg", "tomato-svgrepo-com.svg") or ""
-        manage_btn = IconTextButton("Manage Decks", tomato_icon_path)
-        manage_btn.setMinimumHeight(50)
-        manage_btn.clicked.connect(self.manage_decks)
-        buttons_layout.addWidget(manage_btn)
-
-        stats_btn = QPushButton("  Statistics")
-        stats_btn.setMinimumHeight(50)
-        stats_btn.clicked.connect(self.show_stats)
-        buttons_layout.addWidget(stats_btn)
-
-        exit_btn = QPushButton("🚪 Exit")
-        exit_btn.setMinimumHeight(50)
-        exit_btn.setStyleSheet("background-color: #f44336;")
-        exit_btn.clicked.connect(self.close)
-        buttons_layout.addWidget(exit_btn)
-
-        layout.addLayout(buttons_layout)
-
-        # Sword → Tomato intro animation under buttons
-        sword_tomato = SwordTomatoAnim(size=36)
-        layout.addWidget(sword_tomato)
-        sword_tomato.play()
-
-        # Quick demo: icon popup buttons
-        from PySide6.QtWidgets import QHBoxLayout
-        icon_row = QHBoxLayout()
-        icon_row.setSpacing(12)
-        icon_row.setContentsMargins(0, 8, 0, 0)
-
-        def make_icon_btn(svg_name: str, tooltip: str):
-            btn = QPushButton()
-            path = asset_path("data", "images", "svg", svg_name) or ""
-            if path:
-                btn.setIcon(QIcon(path))
-                btn.setIconSize(QSize(24, 24))
-                btn.clicked.connect(lambda: show_logo_popup(self, path, size=110, lifespan_ms=1000))
-            btn.setFixedSize(36, 36)
-            btn.setToolTip(tooltip)
-            btn.setStyleSheet("QPushButton{background-color:#1E1E1E;border:1px solid #2D2D2D;border-radius:8px;}")
-            return btn
-
-        icon_row.addWidget(make_icon_btn("doro_lexus logo.svg", "Show App Logo"))
-        icon_row.addWidget(make_icon_btn("sword-svgrepo-com.svg", "Show Sword"))
-        icon_row.addWidget(make_icon_btn("tomato-svgrepo-com.svg", "Show Tomato"))
-        icon_row.addWidget(make_icon_btn("student-svgrepo-com.svg", "Show Student"))
-        icon_row.addStretch()
-        layout.addLayout(icon_row)
-        layout.addStretch()
-
-        return menu_widget
-
-    def apply_dark_theme(self):
-        dark_stylesheet = """
-            QWidget { background-color: #121212; color: #E0E0E0; }
-            QMainWindow { background-color: rgba(18,18,18,230); }
-            QLabel { color: #E0E0E0; font-size: 14px; }
+    def apply_theme(self):
+        """Apply the dark theme"""
+        self.setStyleSheet("""
+            QMainWindow {
+                background-color: #1a1a1a;
+                color: #E0E0E0;
+            }
+            QWidget {
+                background-color: transparent;
+                color: #E0E0E0;
+            }
+            QLabel {
+                color: #E0E0E0;
+                font-size: 14px;
+            }
             QPushButton {
                 background-color: #1F6FEB;
                 color: #FFFFFF;
@@ -171,9 +176,17 @@ class DoroLexusApp(QMainWindow):
                 font-size: 14px;
                 font-weight: bold;
             }
-            QPushButton:hover { background-color: #2A7FFF; }
-            QPushButton:pressed { background-color: #1964D0; }
-            QFrame { background-color: #1E1E1E; border: 1px solid #2D2D2D; border-radius: 10px; }
+            QPushButton:hover {
+                background-color: #2A7FFF;
+            }
+            QPushButton:pressed {
+                background-color: #1964D0;
+            }
+            QFrame {
+                background-color: #1E1E1E;
+                border: 1px solid #2D2D2D;
+                border-radius: 10px;
+            }
             QComboBox, QLineEdit, QTextEdit {
                 background-color: #1E1E1E;
                 color: #E0E0E0;
@@ -181,7 +194,10 @@ class DoroLexusApp(QMainWindow):
                 border-radius: 6px;
                 padding: 6px 10px;
             }
-            QListWidget { background-color: #151515; border: 1px solid #2D2D2D; }
+            QListWidget {
+                background-color: #151515;
+                border: 1px solid #2D2D2D;
+            }
             QProgressBar {
                 border: 1px solid #2D2D2D;
                 border-radius: 6px;
@@ -189,40 +205,56 @@ class DoroLexusApp(QMainWindow):
                 color: #E0E0E0;
                 background-color: #1E1E1E;
             }
-            QProgressBar::chunk { background-color: #2EA043; }
-            QHeaderView::section { background-color: #1E1E1E; color: #E0E0E0; border: none; border-bottom: 1px solid #2D2D2D; }
-            QTableWidget { background-color: #151515; color: #E0E0E0; gridline-color: #2D2D2D; }
-        """
-        self.setStyleSheet(dark_stylesheet)
+            QProgressBar::chunk {
+                background-color: #2EA043;
+            }
+        """)
 
-    def setup_connections(self):
-        self.deck_manager.deck_selected.connect(self.on_deck_selected)
+    def show_home(self):
+        """Show the home page"""
+        self.stacked_widget.setCurrentWidget(self.home_page)
+        self.back_button.setVisible(False)
+        if self.header_widget:
+            self.header_widget.setVisible(False)
+        self.home_page.show_with_animation()
 
-    def start_study(self):
+    def show_study(self):
+        """Show the study page"""
         decks = self.db_manager.get_all_decks()
         if not decks:
             QMessageBox.information(self, "No Decks", "Please create a deck first before studying.")
             return
-        self.study_mode.load_decks()
-        self.stacked_widget.setCurrentWidget(self.study_mode)
+            
+        self.study_page.load_decks()
+        self.stacked_widget.setCurrentWidget(self.study_page)
         self.back_button.setVisible(True)
+        if self.header_widget:
+            self.header_widget.setVisible(True)
 
-    def manage_decks(self):
-        self.deck_manager.refresh_decks()
-        self.stacked_widget.setCurrentWidget(self.deck_manager)
+    def show_decks(self):
+        """Show the decks page"""
+        self.decks_page.refresh_decks()
+        self.stacked_widget.setCurrentWidget(self.decks_page)
         self.back_button.setVisible(True)
+        if self.header_widget:
+            self.header_widget.setVisible(True)
+
+    def show_timer(self):
+        """Show the timer page"""
+        self.stacked_widget.setCurrentWidget(self.timer_page)
+        self.back_button.setVisible(True)
+        if self.header_widget:
+            self.header_widget.setVisible(True)
 
     def show_stats(self):
-        self.stats_widget.refresh_stats()
-        self.stacked_widget.setCurrentWidget(self.stats_widget)
+        """Show the stats page"""
+        self.stats_page.refresh_stats()
+        self.stacked_widget.setCurrentWidget(self.stats_page)
         self.back_button.setVisible(True)
-
-    def show_main_menu(self):
-        self.stacked_widget.setCurrentWidget(self.main_menu)
-        self.back_button.setVisible(False)
+        if self.header_widget:
+            self.header_widget.setVisible(True)
 
     def on_deck_selected(self, deck_id):
+        """Handle deck selection"""
         self.current_deck = deck_id
-        self.study_mode.set_current_deck(deck_id)
-
-
+        self.study_page.set_current_deck(deck_id)

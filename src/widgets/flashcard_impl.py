@@ -28,9 +28,11 @@ class FlashcardWidget(QWidget):
         self.setFixedSize(600, 400)
         self.setStyleSheet("""
             QWidget {
-                background-color: white;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(45, 45, 45, 0.95),
+                    stop:1 rgba(30, 30, 30, 0.95));
                 border-radius: 15px;
-                border: 2px solid #ddd;
+                border: 2px solid rgba(255, 255, 255, 0.2);
             }
         """)
         
@@ -43,9 +45,11 @@ class FlashcardWidget(QWidget):
         self.content_frame = QFrame()
         self.content_frame.setStyleSheet("""
             QFrame {
-                background-color: #f8f9fa;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 rgba(60, 60, 60, 0.8),
+                    stop:1 rgba(40, 40, 40, 0.8));
                 border-radius: 10px;
-                border: 1px solid #e9ecef;
+                border: 1px solid rgba(255, 255, 255, 0.1);
             }
         """)
         self.content_frame.setMinimumHeight(250)
@@ -59,10 +63,11 @@ class FlashcardWidget(QWidget):
         self.card_label.setWordWrap(True)
         self.card_label.setStyleSheet("""
             QLabel {
-                color: #333;
+                color: white;
                 font-size: 18px;
                 font-weight: bold;
                 padding: 10px;
+                background: transparent;
             }
         """)
         content_layout.addWidget(self.card_label)
@@ -73,7 +78,9 @@ class FlashcardWidget(QWidget):
         self.flip_button = QPushButton("Show Answer")
         self.flip_button.setStyleSheet("""
             QPushButton {
-                background-color: #007bff;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #64c8ff,
+                    stop:1 #4a9eff);
                 color: white;
                 border: none;
                 padding: 12px 24px;
@@ -82,7 +89,9 @@ class FlashcardWidget(QWidget):
                 font-weight: bold;
             }
             QPushButton:hover {
-                background-color: #0056b3;
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                    stop:0 #5ab8ff,
+                    stop:1 #3d8eff);
             }
         """)
         self.flip_button.clicked.connect(self.flip_card)
@@ -96,13 +105,15 @@ class FlashcardWidget(QWidget):
         
         self.rating_buttons = []
         rating_labels = ["Again", "Hard", "Good", "Easy", "Perfect"]
-        rating_colors = ["#dc3545", "#fd7e14", "#ffc107", "#28a745", "#20c997"]
+        rating_colors = ["#ff6b6b", "#ffa726", "#ffeb3b", "#66bb6a", "#42a5f5"]
         
         for i, (label, color) in enumerate(zip(rating_labels, rating_colors)):
             btn = QPushButton(label)
             btn.setStyleSheet(f"""
                 QPushButton {{
-                    background-color: {color};
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 {color},
+                        stop:1 {self.darken_color(color)});
                     color: white;
                     border: none;
                     padding: 8px 16px;
@@ -111,7 +122,9 @@ class FlashcardWidget(QWidget):
                     font-weight: bold;
                 }}
                 QPushButton:hover {{
-                    background-color: {self.darken_color(color)};
+                    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                        stop:0 {self.lighten_color(color)},
+                        stop:1 {color});
                 }}
             """)
             btn.clicked.connect(lambda checked, rating=i: self.rate_card(rating))
@@ -133,11 +146,22 @@ class FlashcardWidget(QWidget):
     def darken_color(self, color: str) -> str:
         """Darken a hex color for hover effects"""
         color_map = {
-            "#dc3545": "#c82333",
-            "#fd7e14": "#e55a00", 
-            "#ffc107": "#e0a800",
-            "#28a745": "#218838",
-            "#20c997": "#1ea085"
+            "#ff6b6b": "#ff5252",
+            "#ffa726": "#ff9800", 
+            "#ffeb3b": "#fdd835",
+            "#66bb6a": "#4caf50",
+            "#42a5f5": "#2196f3"
+        }
+        return color_map.get(color, color)
+        
+    def lighten_color(self, color: str) -> str:
+        """Lighten a hex color for hover effects"""
+        color_map = {
+            "#ff6b6b": "#ff8a80",
+            "#ffa726": "#ffb74d", 
+            "#ffeb3b": "#fff176",
+            "#66bb6a": "#81c784",
+            "#42a5f5": "#64b5f6"
         }
         return color_map.get(color, color)
         
@@ -190,13 +214,14 @@ class FlashcardWidget(QWidget):
         painter.setRenderHint(QPainter.Antialiasing)
         
         # Draw card shadow
-        shadow_rect = self.rect().adjusted(5, 5, 0, 0)
-        painter.fillRect(shadow_rect, QColor(0, 0, 0, 30))
+        shadow_rect = self.rect().adjusted(8, 8, 0, 0)
+        painter.fillRect(shadow_rect, QColor(0, 0, 0, 60))
         
-        # Draw card background
-        card_rect = self.rect().adjusted(0, 0, -5, -5)
-        painter.setBrush(QBrush(QColor(255, 255, 255)))
-        painter.setPen(QPen(QColor(221, 221, 221), 2))
+        # Draw card background with gradient
+        card_rect = self.rect().adjusted(0, 0, -8, -8)
+        gradient = QBrush(QColor(45, 45, 45))
+        painter.setBrush(gradient)
+        painter.setPen(QPen(QColor(255, 255, 255, 50), 2))
         painter.drawRoundedRect(card_rect, 15, 15)
         
         painter.end()

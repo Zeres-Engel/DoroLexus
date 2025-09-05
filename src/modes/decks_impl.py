@@ -74,10 +74,59 @@ class CardDialog(QDialog):
         self.setModal(True)
         self.resize(500, 400)
         
+        # Apply dark theme
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #1a1a1a;
+                color: white;
+            }
+            QLabel {
+                color: white;
+                background: transparent;
+            }
+            QTextEdit {
+                background-color: #2d2d2d;
+                color: white;
+                border: 2px solid #444;
+                border-radius: 8px;
+                padding: 8px;
+                font-size: 14px;
+            }
+            QTextEdit:focus {
+                border-color: #64c8ff;
+            }
+            QPushButton {
+                background-color: #444;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #555;
+            }
+        """)
+        
         layout = QVBoxLayout(self)
+        layout.setSpacing(15)
+        
+        # Title
+        title = QLabel("Edit Card Details" if self.card_data else "Create New Card")
+        title.setStyleSheet("""
+            QLabel {
+                font-size: 18px;
+                font-weight: bold;
+                color: #64c8ff;
+                margin-bottom: 10px;
+            }
+        """)
+        layout.addWidget(title)
         
         # Form layout
         form_layout = QFormLayout()
+        form_layout.setSpacing(12)
         
         # Front text
         self.front_edit = QTextEdit()
@@ -85,7 +134,7 @@ class CardDialog(QDialog):
         self.front_edit.setMaximumHeight(120)
         if self.card_data:
             self.front_edit.setText(self.card_data.get('front', ''))
-        form_layout.addRow("Front:", self.front_edit)
+        form_layout.addRow("Question (Front):", self.front_edit)
         
         # Back text
         self.back_edit = QTextEdit()
@@ -93,15 +142,32 @@ class CardDialog(QDialog):
         self.back_edit.setMaximumHeight(120)
         if self.card_data:
             self.back_edit.setText(self.card_data.get('back', ''))
-        form_layout.addRow("Back:", self.back_edit)
+        form_layout.addRow("Answer (Back):", self.back_edit)
         
         layout.addLayout(form_layout)
         
         # Buttons
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        buttons_layout = QHBoxLayout()
+        buttons_layout.addStretch()
+        
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.clicked.connect(self.reject)
+        buttons_layout.addWidget(cancel_btn)
+        
+        save_btn = QPushButton("Save Card")
+        save_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #64c8ff;
+                color: white;
+            }
+            QPushButton:hover {
+                background-color: #4a9eff;
+            }
+        """)
+        save_btn.clicked.connect(self.accept)
+        buttons_layout.addWidget(save_btn)
+        
+        layout.addLayout(buttons_layout)
         
     def get_card_data(self):
         """Get the card data from the form"""

@@ -14,10 +14,10 @@ class DatabaseManager:
     
     def __init__(self, db_path: str = None):
         """Initialize database connection and create tables if needed"""
-        # Default DB path inside data/database directory
+        # Default DB path inside data directory
         if db_path is None:
             base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            data_dir = os.path.join(base_dir, 'data', 'database')
+            data_dir = os.path.join(base_dir, 'data')
             os.makedirs(data_dir, exist_ok=True)
             db_path = os.path.join(data_dir, 'dorolexus.db')
 

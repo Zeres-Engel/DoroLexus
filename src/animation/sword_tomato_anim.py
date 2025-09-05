@@ -9,6 +9,7 @@ class SwordTomatoAnim(QWidget):
     def __init__(self, size: int = 48, parent=None):
         super().__init__(parent)
         self.size = size
+        self.setStyleSheet("background: transparent; border: none; outline: none;")
 
         # Icons
         tomato_path = asset_path('data','images','svg','tomato-svgrepo-com.svg') or ''
@@ -16,11 +17,13 @@ class SwordTomatoAnim(QWidget):
 
         self.tomato = QLabel()
         self.tomato.setFixedSize(size, size)
+        self.tomato.setStyleSheet("background: transparent; border: none; outline: none;")
         if tomato_path:
             self.tomato.setPixmap(QIcon(tomato_path).pixmap(size, size))
 
         self.sword = QLabel()
         self.sword.setFixedSize(size, size)
+        self.sword.setStyleSheet("background: transparent; border: none; outline: none;")
         if sword_path:
             self.sword.setPixmap(QIcon(sword_path).pixmap(size, size))
 
