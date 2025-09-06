@@ -4,6 +4,7 @@ Timer page wrapper for study timer
 
 from PySide6.QtWidgets import QWidget, QVBoxLayout
 from src.modes.timer_impl import StudyTimerWidget
+from src.ui import TimerPageHeaderLayout
 
 
 class TimerPage(QWidget):
@@ -16,7 +17,12 @@ class TimerPage(QWidget):
     def init_ui(self):
         """Initialize the timer page"""
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(20)
+        
+        # Page header
+        self.header = TimerPageHeaderLayout()
+        layout.addWidget(self.header)
         
         # Use the existing StudyTimerWidget implementation
         self.timer_widget = StudyTimerWidget()

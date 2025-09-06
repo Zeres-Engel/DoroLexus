@@ -10,8 +10,11 @@ from PySide6.QtGui import QFont, QIcon
 from src.core import DatabaseManager
 from src.core.paths import asset_path
 from src.pages import HomePage, StudyPage, DecksPage, TimerPage, StatsPage
-from src.animation import AnimatedIconLabel, show_logo_popup
-from src.ui.buttons import PrimaryButton
+from src.animation import AnimatedIconLabel, show_logo_popup, CosmicParticleSystem
+from src.widgets.button_widget import PrimaryButtonWidget as PrimaryButton
+
+
+# Removed simple overlay - using CosmicParticleSystem instead
 
 
 class DoroLexusApp(QMainWindow):
@@ -23,6 +26,11 @@ class DoroLexusApp(QMainWindow):
         self.current_deck = None
         self.init_ui()
         self.setup_connections()
+        # Create cosmic particle system on top of all content (after UI is built)
+        self._cosmic_particles = CosmicParticleSystem(self.centralWidget())
+        self._cosmic_particles.setGeometry(0, 0, self.width(), self.height())
+        self._cosmic_particles.show()
+        self._cosmic_particles.raise_()
 
     def init_ui(self):
         """Initialize the main UI"""
@@ -43,6 +51,9 @@ class DoroLexusApp(QMainWindow):
         # Main widget and layout
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
+        
+        # Overlay canvas will render above all content
+        
         main_layout = QVBoxLayout(central_widget)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
@@ -53,6 +64,8 @@ class DoroLexusApp(QMainWindow):
         # Stacked widget for pages
         self.stacked_widget = QStackedWidget()
         main_layout.addWidget(self.stacked_widget)
+        # Make sure content is above background
+        self.stacked_widget.raise_()
 
         # Initialize pages
         self.init_pages()
@@ -61,6 +74,10 @@ class DoroLexusApp(QMainWindow):
         self.stacked_widget.setCurrentWidget(self.home_page)
         if self.header_widget:
             self.header_widget.setVisible(False)
+        
+        # Start the home page animation after a short delay to ensure proper initialization
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(100, self.home_page.show_with_animation)
         
         # Show logo popup on startup
         if icon_path:
@@ -72,10 +89,8 @@ class DoroLexusApp(QMainWindow):
         header_widget.setFixedHeight(80)
         header_widget.setStyleSheet("""
             QWidget {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 rgba(31, 111, 235, 0.1),
-                    stop:1 rgba(18, 18, 18, 0.95));
-                border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+                background: transparent;
+                border: none;
             }
         """)
         
@@ -96,13 +111,14 @@ class DoroLexusApp(QMainWindow):
         title_font = QFont()
         title_font.setPointSize(24)
         title_font.setBold(True)
-        title_font.setFamily("Arial")
+        title_font.setFamily("Cascadia Code")
         title_label.setFont(title_font)
         title_label.setStyleSheet("""
             QLabel {
-                color: #E0E0E0;
+                color: #FFFFFF;
                 background: transparent;
                 margin: 10px 0px 10px 10px;
+                font-weight: bold;
             }
         """)
         header_layout.addWidget(title_label)
@@ -153,10 +169,10 @@ class DoroLexusApp(QMainWindow):
         self.decks_page.deck_selected.connect(self.on_deck_selected)
 
     def apply_theme(self):
-        """Apply the dark theme"""
+        """Apply the dark theme with transparent background for animated background"""
         self.setStyleSheet("""
             QMainWindow {
-                background-color: #1a1a1a;
+                background-color: transparent;
                 color: #E0E0E0;
             }
             QWidget {
@@ -258,3 +274,11 @@ class DoroLexusApp(QMainWindow):
         """Handle deck selection"""
         self.current_deck = deck_id
         self.study_page.set_current_deck(deck_id)
+        
+    def resizeEvent(self, event):
+        """Handle window resize"""
+        super().resizeEvent(event)
+        # Keep cosmic particles covering the full area and on top
+        if hasattr(self, '_cosmic_particles') and self._cosmic_particles:
+            self._cosmic_particles.setGeometry(0, 0, self.width(), self.height())
+            self._cosmic_particles.raise_()

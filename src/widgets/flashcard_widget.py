@@ -1,5 +1,5 @@
 """
-Flashcard widget for displaying and interacting with flashcards
+Flashcard Widget for displaying and interacting with flashcards
 Includes flip animation and study controls
 """
 
@@ -68,6 +68,7 @@ class FlashcardWidget(QWidget):
                 font-weight: bold;
                 padding: 10px;
                 background: transparent;
+                font-family: "Cascadia Code", "Cascadia Mono", "Fira Code", "Consolas", "Courier New", monospace;
             }
         """)
         content_layout.addWidget(self.card_label)
@@ -87,6 +88,7 @@ class FlashcardWidget(QWidget):
                 border-radius: 8px;
                 font-size: 16px;
                 font-weight: bold;
+                font-family: "Cascadia Code", "Cascadia Mono", "Fira Code", "Consolas", "Courier New", monospace;
             }
             QPushButton:hover {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
@@ -120,6 +122,7 @@ class FlashcardWidget(QWidget):
                     border-radius: 6px;
                     font-size: 14px;
                     font-weight: bold;
+                    font-family: "Cascadia Code", "Cascadia Mono", "Fira Code", "Consolas", "Courier New", monospace;
                 }}
                 QPushButton:hover {{
                     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,

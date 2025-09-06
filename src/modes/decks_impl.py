@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QFormLayout, QGroupBox, QSplitter)
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont, QIcon
+from src.ui import CardDialogLayout
 import os
 from src.core.paths import asset_path
 
@@ -77,7 +78,7 @@ class CardDialog(QDialog):
         # Apply dark theme
         self.setStyleSheet("""
             QDialog {
-                background-color: #1a1a1a;
+                background: transparent;
                 color: white;
             }
             QLabel {
@@ -175,6 +176,9 @@ class CardDialog(QDialog):
             'front': self.front_edit.toPlainText().strip(),
             'back': self.back_edit.toPlainText().strip()
         }
+
+# Alias for backward compatibility - use the new layout component
+# CardDialog = CardDialogLayout
 
 class DeckManager(QWidget):
     """Widget for managing flashcard decks and cards"""

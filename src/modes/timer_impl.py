@@ -112,7 +112,7 @@ class StudyTimerWidget(QWidget):
         time_font = QFont()
         time_font.setPointSize(48)
         time_font.setBold(True)
-        time_font.setFamily("Courier New")
+        time_font.setFamily("Cascadia Code")
         self.time_display.setFont(time_font)
         self.time_display.setAlignment(Qt.AlignCenter)
         self.time_display.setStyleSheet("""
