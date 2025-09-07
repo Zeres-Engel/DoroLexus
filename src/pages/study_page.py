@@ -9,9 +9,9 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
 from PySide6.QtCore import Qt, Signal, QPropertyAnimation, QEasingCurve, QRect
 from PySide6.QtGui import QFont, QIcon, QPixmap, QPainter, QBrush, QColor, QPen
 from src.widgets.button_widget import PrimaryButtonWidget as PrimaryButton, IconTextButtonWidget as IconTextButton
-from src.ui import (StudyPageHeaderLayout, StudyDeckSelectionLayout)
+from src.widgets.deck_gallery_widget import DeckGalleryWidget, DeckGalleryMode
 from src.widgets.table_widget import ReviewTableWidget
-from src.widgets.study_mode_menu_widget import StudyModeMenuWidget
+from src.widgets.nav_bar_widget import NavBarWidget
 import os
 from src.core.paths import asset_path
 
@@ -57,10 +57,11 @@ class StudyPage(QWidget):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(20)
         
-        # Page header
-        self.header = StudyPageHeaderLayout()
-        self.header.back_requested.connect(self.handle_back_navigation)
-        layout.addWidget(self.header)
+        # Top navigation bar
+        self.navbar = NavBarWidget("Study Mode", show_back_button=False)
+        self.navbar.back_requested.connect(self.handle_back_navigation)
+        self.navbar.home_requested.connect(self._navigate_to_home)
+        layout.addWidget(self.navbar)
         
         # Content area with stacked widgets for different views
         self.content_stack = QStackedWidget()
@@ -72,36 +73,19 @@ class StudyPage(QWidget):
         """)
         
         # 1. Deck selection view
-        self.deck_selection_widget = StudyDeckSelectionLayout()
-        self.deck_selection_widget.deck_selected.connect(self.on_deck_selected)
-        self.content_stack.addWidget(self.deck_selection_widget)
+        self.deck_gallery = DeckGalleryWidget(
+            mode=DeckGalleryMode.STUDY,
+            title="⚔️ Choose Your Weapon ⚔️",
+            show_title=True
+        )
+        self.deck_gallery.deck_selected.connect(self.on_deck_selection_changed)
+        self.deck_gallery.deck_preview.connect(self.on_deck_selected)
+        self.deck_gallery.selection_changed.connect(self.on_selection_changed)
+        self.content_stack.addWidget(self.deck_gallery)
         
-        # 2. Combined study view (mode menu + review table in one scrollable page)
-        self.study_mode_menu = StudyModeMenuWidget()
-        self.study_mode_menu.mode_selected.connect(self.on_study_mode_selected)
-
-        self.study_combined_container = QWidget()
-        self.study_combined_layout = QVBoxLayout(self.study_combined_container)
-        self.study_combined_layout.setContentsMargins(0, 0, 0, 0)
-        self.study_combined_layout.setSpacing(30)
-        self.study_combined_layout.addWidget(self.study_mode_menu)
-
-        # Review table section (between mode selection and study widget)
+        # 2. Card preview view (just review table)
         self.review_table = ReviewTableWidget()
-        self.study_combined_layout.addWidget(self.review_table)
-
-        self.study_scroll = QScrollArea()
-        self.study_scroll.setWidgetResizable(True)
-        self.study_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.study_scroll.setWidget(self.study_combined_container)
-        self.study_scroll.setStyleSheet("""
-            QScrollArea {
-                background-color: transparent;
-                border: none;
-            }
-        """)
-
-        self.content_stack.addWidget(self.study_scroll)
+        self.content_stack.addWidget(self.review_table)
         
         layout.addWidget(self.content_stack)
         
@@ -140,17 +124,19 @@ class StudyPage(QWidget):
     def _show_deck_gallery(self):
         """Show deck selection gallery"""
         self.current_view = self.VIEW_DECK_GALLERY
-        self.content_stack.setCurrentWidget(self.deck_selection_widget)
-        self.header.show_deck_selection()
+        self.content_stack.setCurrentWidget(self.deck_gallery)
+        self.navbar.set_title("Study Decks")
+        # Show back button so user can return to Home from deck gallery
+        self.navbar.show_back_button()
+        # Load decks and ensure proper state
         self._load_decks()
     
-    def _show_study_mode_selection(self):
-        """Show study mode selection with review table"""
+    def _show_card_preview(self):
+        """Show card preview table"""
         self.current_view = self.VIEW_STUDY_MODE
-        self.content_stack.setCurrentWidget(self.study_scroll)
-        self.header.show_deck_selection()
-        # Scroll to top to show mode selection first
-        self.study_scroll.verticalScrollBar().setValue(0)
+        self.content_stack.setCurrentWidget(self.review_table)
+        self.navbar.set_title(f"Preview: {self.current_deck_name}")
+        self.navbar.show_back_button()
     
     # ==================== DATA METHODS ====================
     
@@ -161,7 +147,7 @@ class StudyPage(QWidget):
         for deck in decks:
             due_cards = self.db_manager.get_cards_due_for_review(deck['id'])
             deck['due_count'] = len(due_cards) if due_cards else 0
-        self.deck_selection_widget.refresh_decks(decks)
+        self.deck_gallery.refresh_decks(decks)
         
     def _prepare_deck_data(self, deck_id):
         """Load and prepare deck data for study mode"""
@@ -186,42 +172,64 @@ class StudyPage(QWidget):
     # ==================== EVENT HANDLERS ====================
     
     def on_deck_selected(self, deck_id):
-        """Handle deck selection - transition to study mode selection"""
+        """Handle deck preview request - show card preview"""
         self.current_deck_id = deck_id
         
         if self._prepare_deck_data(deck_id):
-            self._show_study_mode_selection()
+            self._show_card_preview()
+    
+    def on_deck_selection_changed(self, deck_id):
+        """Handle deck selection/deselection for multi-select mode"""
+        # This is for toggling selections, not preview
+        pass
+    
+    def on_selection_changed(self, selected_deck_ids):
+        """Handle when the selection list changes"""
+        # Update any UI that depends on selection count
+        # Could show/hide study mode menu based on selection count
+        pass
+    
+    def on_study_mode_selected(self, mode_type, selected_deck_ids):
+        """Handle study mode selection with multiple decks"""
+        # TODO: Implement actual study mode launching with selected decks
+        from PySide6.QtWidgets import QMessageBox
+        deck_names = []
+        for deck_id in selected_deck_ids:
+            decks = self.db_manager.get_all_decks()
+            deck = next((d for d in decks if d['id'] == deck_id), None)
+            if deck:
+                deck_names.append(deck['name'])
         
-    def on_study_mode_selected(self, mode_type):
-        """Handle study mode selection - scroll to review table"""
-        self.current_study_mode = mode_type
-        self._scroll_to_review_table()
-        
-    def _scroll_to_review_table(self):
-        """Scroll to review table to show card preview"""
-        if not self.current_deck_id:
-            QMessageBox.warning(self, "No Deck Selected", "Please select a deck first.")
-            return
-            
-        # Ensure we're showing the study mode view
-        self.content_stack.setCurrentWidget(self.study_scroll)
-        
-        # Smooth scroll to review table
-        try:
-            self.study_scroll.ensureWidgetVisible(self.review_table, 0, 40)
-        except Exception:
-            self.study_scroll.verticalScrollBar().setValue(self.review_table.y())
+        deck_list = ", ".join(deck_names)
+        QMessageBox.information(
+            self,
+            "Study Mode Selected",
+            f"Starting {mode_type} study mode with decks:\n{deck_list}\n\n"
+            f"(Study implementation coming soon...)"
+        )
     
     # ==================== PUBLIC API ====================
     
     def load_decks(self):
         """Public API: Load and refresh decks (called by main window)"""
+        # Reset to deck gallery view when loading
+        self._show_deck_gallery()
         self._load_decks()
+    
+    def reset_to_initial_state(self):
+        """Reset the study page to its initial state"""
+        self.current_view = self.VIEW_DECK_GALLERY
+        self.current_deck_id = None
+        self.current_deck_name = ""
+        self.current_study_mode = "review"
+        # Clear any selections in the deck gallery
+        self.deck_gallery.clear_selection()
+        self._show_deck_gallery()
         
     def set_current_deck(self, deck_id):
-        """Public API: Set current deck and show study mode selection"""
+        """Public API: Set current deck and show card preview"""
         self.current_deck_id = deck_id
         
         if self._prepare_deck_data(deck_id):
-            self._show_study_mode_selection()
+            self._show_card_preview()
 

@@ -11,7 +11,6 @@ from src.core import DatabaseManager
 from src.core.paths import asset_path
 from src.pages import HomePage, StudyPage, DecksPage, TimerPage, StatsPage
 from src.animation import AnimatedIconLabel, show_logo_popup, CosmicParticleSystem
-from src.widgets.button_widget import PrimaryButtonWidget as PrimaryButton
 
 
 # Removed simple overlay - using CosmicParticleSystem instead
@@ -26,11 +25,15 @@ class DoroLexusApp(QMainWindow):
         self.current_deck = None
         self.init_ui()
         self.setup_connections()
-        # Create cosmic particle system on top of all content (after UI is built)
-        self._cosmic_particles = CosmicParticleSystem(self.centralWidget())
+        # Create cosmic particle system as an overlay on the main window
+        self._cosmic_particles = CosmicParticleSystem(self)
         self._cosmic_particles.setGeometry(0, 0, self.width(), self.height())
+        self._cosmic_particles.setVisible(True)
         self._cosmic_particles.show()
+        # Render above content but ignore mouse events (set in widget)
         self._cosmic_particles.raise_()
+        # Force initial paint
+        self._cosmic_particles.update()
 
     def init_ui(self):
         """Initialize the main UI"""
@@ -58,8 +61,8 @@ class DoroLexusApp(QMainWindow):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # Header
-        self.header_widget = self.create_header(main_layout)
+        # No global header; pages render their own nav bars
+        self.header_widget = None
 
         # Stacked widget for pages
         self.stacked_widget = QStackedWidget()
@@ -70,10 +73,8 @@ class DoroLexusApp(QMainWindow):
         # Initialize pages
         self.init_pages()
         
-        # Start with home page and hide header for home
+        # Start with home page
         self.stacked_widget.setCurrentWidget(self.home_page)
-        if self.header_widget:
-            self.header_widget.setVisible(False)
         
         # Start the home page animation after a short delay to ensure proper initialization
         from PySide6.QtCore import QTimer
@@ -83,56 +84,7 @@ class DoroLexusApp(QMainWindow):
         if icon_path:
             show_logo_popup(self, icon_path, size=96, lifespan_ms=900)
 
-    def create_header(self, layout):
-        """Create the header section"""
-        header_widget = QWidget()
-        header_widget.setFixedHeight(80)
-        header_widget.setStyleSheet("""
-            QWidget {
-                background: transparent;
-                border: none;
-            }
-        """)
-        
-        header_layout = QHBoxLayout(header_widget)
-        header_layout.setContentsMargins(20, 10, 20, 10)
-        header_layout.setSpacing(15)
-
-        # Logo
-        logo_path = asset_path("data", "images", "svg", "doro_lexus logo.svg")
-        if logo_path:
-            logo_widget = AnimatedIconLabel(logo_path, size=48)
-            logo_widget.start()
-            logo_widget.clicked.connect(lambda: show_logo_popup(self, logo_path, size=120, lifespan_ms=1000))
-            header_layout.addWidget(logo_widget)
-
-        # Title
-        title_label = QLabel("DoroLexus")
-        title_font = QFont()
-        title_font.setPointSize(24)
-        title_font.setBold(True)
-        title_font.setFamily("Cascadia Code")
-        title_label.setFont(title_font)
-        title_label.setStyleSheet("""
-            QLabel {
-                color: #FFFFFF;
-                background: transparent;
-                margin: 10px 0px 10px 10px;
-                font-weight: bold;
-            }
-        """)
-        header_layout.addWidget(title_label)
-        header_layout.addStretch()
-
-        # Back button
-        self.back_button = PrimaryButton("← Back")
-        self.back_button.setFixedSize(100, 40)
-        self.back_button.clicked.connect(self.on_back_clicked)
-        self.back_button.setVisible(False)
-        header_layout.addWidget(self.back_button)
-
-        layout.addWidget(header_widget)
-        return header_widget
+    # Removed global header creation
 
     def init_pages(self):
         """Initialize all pages"""
@@ -229,9 +181,11 @@ class DoroLexusApp(QMainWindow):
     def show_home(self):
         """Show the home page"""
         self.stacked_widget.setCurrentWidget(self.home_page)
-        self.back_button.setVisible(False)
-        if self.header_widget:
-            self.header_widget.setVisible(False)
+        # Refresh cosmic particles when showing home
+        if hasattr(self, '_cosmic_particles') and self._cosmic_particles:
+            self._cosmic_particles.show()
+            self._cosmic_particles.raise_()
+            self._cosmic_particles.update()
         self.home_page.show_with_animation()
 
     def show_study(self):
@@ -240,35 +194,39 @@ class DoroLexusApp(QMainWindow):
         if not decks:
             QMessageBox.information(self, "No Decks", "Please create a deck first before studying.")
             return
-            
-        self.study_page.load_decks()
+        
+        # Pause cosmic particles during navigation for smoother transition
+        if hasattr(self, '_cosmic_particles') and self._cosmic_particles:
+            self._cosmic_particles.pause_animation()
+        
+        # Reset study page to initial state for clean navigation
+        self.study_page.reset_to_initial_state()
         self.stacked_widget.setCurrentWidget(self.study_page)
-        self.back_button.setVisible(True)
-        if self.header_widget:
-            self.header_widget.setVisible(True)
+        
+        # Resume cosmic particles after a short delay
+        from PySide6.QtCore import QTimer
+        QTimer.singleShot(200, self._resume_cosmic_particles)
 
     def show_decks(self):
         """Show the decks page"""
         self.decks_page.refresh_decks()
         self.stacked_widget.setCurrentWidget(self.decks_page)
-        self.back_button.setVisible(True)
-        if self.header_widget:
-            self.header_widget.setVisible(True)
 
     def show_timer(self):
         """Show the timer page"""
         self.stacked_widget.setCurrentWidget(self.timer_page)
-        self.back_button.setVisible(True)
-        if self.header_widget:
-            self.header_widget.setVisible(True)
 
     def show_stats(self):
         """Show the stats page"""
         self.stats_page.refresh_stats()
         self.stacked_widget.setCurrentWidget(self.stats_page)
-        self.back_button.setVisible(True)
-        if self.header_widget:
-            self.header_widget.setVisible(True)
+    
+    def _resume_cosmic_particles(self):
+        """Resume cosmic particle animation"""
+        if hasattr(self, '_cosmic_particles') and self._cosmic_particles:
+            self._cosmic_particles.resume_animation()
+            self._cosmic_particles.raise_()
+            self._cosmic_particles.update()
 
     def on_deck_selected(self, deck_id):
         """Handle deck selection"""
@@ -288,10 +246,21 @@ class DoroLexusApp(QMainWindow):
             pass
         self.show_home()
         
+    def showEvent(self, event):
+        """Handle window show event"""
+        super().showEvent(event)
+        # Ensure cosmic particles are visible when window is shown
+        if hasattr(self, '_cosmic_particles') and self._cosmic_particles:
+            self._cosmic_particles.show()
+            self._cosmic_particles.raise_()
+            self._cosmic_particles.update()
+    
     def resizeEvent(self, event):
         """Handle window resize"""
         super().resizeEvent(event)
-        # Keep cosmic particles covering the full area and on top
+        # Keep cosmic particles covering the full area but behind content
         if hasattr(self, '_cosmic_particles') and self._cosmic_particles:
             self._cosmic_particles.setGeometry(0, 0, self.width(), self.height())
+            # Do not recreate stars on resize; just ensure overlay stays on top
             self._cosmic_particles.raise_()
+            self._cosmic_particles.update()  # Force repaint

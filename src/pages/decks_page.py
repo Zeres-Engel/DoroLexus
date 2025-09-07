@@ -11,8 +11,9 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
 from PySide6.QtCore import Qt, Signal, QPropertyAnimation, QEasingCurve, QRect
 from PySide6.QtGui import QFont, QIcon, QPixmap, QPainter, QBrush, QColor, QPen
 from src.widgets.button_widget import PrimaryButtonWidget as PrimaryButton, DangerButtonWidget as DangerButton, IconTextButtonWidget as IconTextButton
-from src.ui import (DeckGalleryLayout, CardManagementLayout, DeckDialogLayout, CardDialogLayout, 
-                   DecksPageHeaderLayout)
+from src.widgets.deck_gallery_widget import DeckGalleryWidget, DeckGalleryMode
+from src.ui import (CardManagementLayout, DeckDialogLayout, CardDialogLayout)
+from src.widgets.nav_bar_widget import NavBarWidget
 import os
 from src.core.paths import asset_path
 
@@ -57,20 +58,25 @@ class DecksPage(QWidget):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(20)
         
-        # Page header
-        self.header = DecksPageHeaderLayout()
-        self.header.back_requested.connect(self.handle_back_navigation)
-        layout.addWidget(self.header)
+        # Top navigation bar
+        self.navbar = NavBarWidget("Deck Management", show_back_button=True)
+        self.navbar.back_requested.connect(self.handle_back_navigation)
+        self.navbar.home_requested.connect(self._navigate_to_home)
+        layout.addWidget(self.navbar)
         
         # Create stacked widget for different views
         self.stacked_widget = QStackedWidget()
         
         # Deck gallery view
-        self.deck_gallery = DeckGalleryLayout()
+        self.deck_gallery = DeckGalleryWidget(
+            mode=DeckGalleryMode.MANAGEMENT,
+            title="Manage Your Decks",
+            show_title=True
+        )
         self.deck_gallery.deck_selected.connect(self.deck_selected.emit)
-        self.deck_gallery.edit_deck.connect(self.edit_deck)
-        self.deck_gallery.delete_deck.connect(self.delete_deck)
-        self.deck_gallery.create_deck.connect(self.create_deck)
+        self.deck_gallery.deck_edit.connect(self.edit_deck)
+        self.deck_gallery.deck_delete.connect(self.delete_deck)
+        self.deck_gallery.deck_create.connect(self.create_deck)
         self.stacked_widget.addWidget(self.deck_gallery)
         
         # Card management view
@@ -119,6 +125,8 @@ class DecksPage(QWidget):
         self.current_view = self.VIEW_DECK_GALLERY
         self.stacked_widget.setCurrentWidget(self.deck_gallery)
         self._refresh_decks()
+        # Always show back button (back to home from gallery)
+        self.navbar.show_back_button()
     
     def _show_card_management(self, deck_id, deck_name):
         """Show card management view for specific deck"""
@@ -126,6 +134,7 @@ class DecksPage(QWidget):
         self.card_management.set_deck(deck_id, deck_name)
         self.card_management.refresh_cards(self.db_manager.get_cards_in_deck(deck_id))
         self.stacked_widget.setCurrentWidget(self.card_management)
+        self.navbar.show_back_button()
     
     # ==================== DATA METHODS ====================
     

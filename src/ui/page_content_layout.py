@@ -9,129 +9,18 @@ from PySide6.QtCore import Qt, Signal
 from ..widgets.button_widget import PrimaryButtonWidget, DangerButtonWidget
 
 
-class DeckGalleryLayout(QWidget):
-    """Layout for displaying deck cards in a gallery format"""
-    
-    deck_selected = Signal(int)  # For studying
-    edit_deck = Signal(int)      # For editing cards
-    delete_deck = Signal(int)
-    create_deck = Signal()
-    
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.deck_cards = []
-        self.init_ui()
-        
-    def init_ui(self):
-        """Initialize the deck gallery UI"""
-        self.setStyleSheet("""
-            DeckGalleryLayout {
-                background: transparent;
-            }
-            QWidget {
-                background: transparent;
-            }
-        """)
-        
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(20)
-        
-        # Instructions
-        instructions = QLabel("Create new decks or manage existing ones")
-        instructions.setAlignment(Qt.AlignCenter)
-        instructions.setStyleSheet("""
-            QLabel {
-                color: rgba(255, 255, 255, 0.8);
-                font-size: 16px;
-                background: transparent;
-                font-family: "Cascadia Code", "Cascadia Mono", "Fira Code", "Consolas", "Courier New", monospace;
-            }
-        """)
-        layout.addWidget(instructions)
-        
-        # Scroll area for deck cards
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        scroll_area.setStyleSheet("""
-            QScrollArea {
-                background-color: transparent;
-                border: none;
-            }
-            QScrollBar:vertical {
-                background-color: rgba(255, 255, 255, 0.1);
-                width: 8px;
-                border-radius: 4px;
-            }
-            QScrollBar::handle:vertical {
-                background-color: rgba(255, 255, 255, 0.3);
-                border-radius: 4px;
-                min-height: 20px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background-color: rgba(255, 255, 255, 0.5);
-            }
-        """)
-        
-        # Deck cards container
-        self.deck_cards_widget = QWidget()
-        self.deck_cards_layout = QGridLayout(self.deck_cards_widget)
-        self.deck_cards_layout.setSpacing(20)
-        self.deck_cards_layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
-        
-        scroll_area.setWidget(self.deck_cards_widget)
-        layout.addWidget(scroll_area)
-        
-    def refresh_decks(self, decks):
-        """Refresh the deck gallery with new deck data"""
-        # Clear existing cards
-        for card in self.deck_cards:
-            card.deleteLater()
-        self.deck_cards.clear()
-        
-        # Clear layout
-        while self.deck_cards_layout.count():
-            child = self.deck_cards_layout.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
-        
-        # Create deck cards
-        cols = 4  # Number of columns
-        for i, deck in enumerate(decks):
-            from .deck_card_layout import DeckManagementCardLayout
-            deck_card = DeckManagementCardLayout(deck)
-            deck_card.deck_selected.connect(self.deck_selected.emit)
-            deck_card.edit_deck.connect(self.edit_deck.emit)
-            deck_card.delete_deck.connect(self.delete_deck.emit)
-            self.deck_cards.append(deck_card)
-            
-            # Position deck cards
-            row = i // cols
-            col = i % cols
-            self.deck_cards_layout.addWidget(deck_card, row, col)
-        
-        # Add create deck card at the end
-        from .deck_card_layout import CreateDeckCardLayout
-        create_card = CreateDeckCardLayout()
-        create_card.create_deck.connect(self.create_deck.emit)
-        
-        # Calculate position for create card (after all deck cards)
-        total_decks = len(decks)
-        create_row = total_decks // cols
-        create_col = total_decks % cols
-        self.deck_cards_layout.addWidget(create_card, create_row, create_col)
 
 
 class StudyDeckSelectionLayout(QWidget):
-    """Layout for study page deck selection"""
+    """Layout for study page deck selection with multi-selection and study mode menu"""
     
-    deck_selected = Signal(int)
+    deck_selected = Signal(int)  # For single deck preview
+    study_mode_selected = Signal(str, list)  # mode_type, selected_deck_ids
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.deck_cards = []
+        self.selected_deck_ids = []
+        self.deck_id_to_name = {}
         self.init_ui()
         
     def init_ui(self):
@@ -149,92 +38,58 @@ class StudyDeckSelectionLayout(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(20)
         
-        # Instructions
-        instructions = QLabel("Choose a deck to start studying")
-        instructions.setAlignment(Qt.AlignCenter)
-        instructions.setStyleSheet("""
-            QLabel {
-                color: rgba(255, 255, 255, 0.8);
-                font-size: 16px;
-                background: transparent;
-                font-family: "Cascadia Code", "Cascadia Mono", "Fira Code", "Consolas", "Courier New", monospace;
-            }
-        """)
-        layout.addWidget(instructions)
+        # Compact study mode menu (initially hidden)
+        from src.widgets.compact_study_menu_widget import CompactStudyMenuWidget
+        self.study_menu = CompactStudyMenuWidget()
+        # Start should trigger upward emission with current selected decks
+        self.study_menu.start_requested.connect(lambda mode, decks: self.study_mode_selected.emit(mode, decks))
+        # Cancel clears selection and hides the menu via our helper
+        self.study_menu.cancel_requested.connect(self.clear_selection)
+        # Retain mode_selected for potential future UI reactions
+        self.study_menu.mode_selected.connect(self._on_study_mode_selected)
+        layout.addWidget(self.study_menu)
         
-        # Scroll area for deck cards
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        scroll_area.setStyleSheet("""
-            QScrollArea {
-                background-color: transparent;
-                border: none;
-            }
-            QScrollBar:vertical {
-                background-color: rgba(255, 255, 255, 0.1);
-                width: 8px;
-                border-radius: 4px;
-            }
-            QScrollBar::handle:vertical {
-                background-color: rgba(255, 255, 255, 0.3);
-                border-radius: 4px;
-                min-height: 20px;
-            }
-            QScrollBar::handle:vertical:hover {
-                background-color: rgba(255, 255, 255, 0.5);
-            }
-        """)
-        
-        # Deck cards container
-        self.deck_cards_widget = QWidget()
-        self.deck_cards_layout = QGridLayout(self.deck_cards_widget)
-        self.deck_cards_layout.setSpacing(20)
-        self.deck_cards_layout.setAlignment(Qt.AlignTop | Qt.AlignHCenter)
-        
-        scroll_area.setWidget(self.deck_cards_widget)
-        layout.addWidget(scroll_area)
+        # Responsive deck gallery (with title)
+        from .responsive_deck_gallery_layout import ResponsiveDeckGalleryLayout
+        self.deck_gallery = ResponsiveDeckGalleryLayout()
+        self.deck_gallery.deck_selected.connect(self._on_deck_toggled)
+        self.deck_gallery.preview_requested.connect(self.deck_selected.emit)
+        layout.addWidget(self.deck_gallery)
         
     def refresh_decks(self, decks):
         """Refresh the deck selection with new deck data"""
-        # Clear existing cards
-        for card in self.deck_cards:
-            card.deleteLater()
-        self.deck_cards.clear()
+        # Store deck names for reference
+        self.deck_id_to_name = {deck['id']: deck['name'] for deck in decks}
         
-        # Clear layout
-        while self.deck_cards_layout.count():
-            child = self.deck_cards_layout.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
+        # Delegate to responsive deck gallery
+        self.deck_gallery.refresh_decks(decks)
+    
+    def _on_deck_toggled(self, deck_id):
+        """Handle deck selection/deselection (no preview)"""
+        if deck_id in self.selected_deck_ids:
+            self.selected_deck_ids.remove(deck_id)
+        else:
+            self.selected_deck_ids.append(deck_id)
         
-        if not decks:
-            # Show no decks message
-            no_decks_label = QLabel("No decks available. Create some decks first!")
-            no_decks_label.setAlignment(Qt.AlignCenter)
-            no_decks_label.setStyleSheet("""
-                QLabel {
-                    color: rgba(255, 255, 255, 0.6);
-                    font-size: 16px;
-                    background: transparent;
-                    font-family: "Cascadia Code", "Cascadia Mono", "Fira Code", "Consolas", "Courier New", monospace;
-                }
-            """)
-            self.deck_cards_layout.addWidget(no_decks_label)
-            return
-        
-        # Create deck cards
-        cols = 3  # Number of columns
-        for i, deck in enumerate(decks):
-            from .deck_card_layout import StudyDeckCardLayout
-            deck_card = StudyDeckCardLayout(deck)
-            deck_card.deck_selected.connect(self.deck_selected.emit)
-            self.deck_cards.append(deck_card)
-            
-            row = i // cols
-            col = i % cols
-            self.deck_cards_layout.addWidget(deck_card, row, col)
+        # Update study menu visibility and content
+        selected_names = [self.deck_id_to_name.get(deck_id, f"Deck {deck_id}") 
+                         for deck_id in self.selected_deck_ids]
+        self.study_menu.set_selected_decks(self.selected_deck_ids, selected_names)
+    
+    def _on_study_mode_selected(self, mode_type):
+        """Handle study mode selection"""
+        if self.selected_deck_ids:
+            self.study_mode_selected.emit(mode_type, self.selected_deck_ids.copy())
+    
+    def clear_selection(self):
+        """Clear all deck selections"""
+        self.selected_deck_ids.clear()
+        self.deck_gallery.clear_selection()
+        self.study_menu.set_selected_decks([])
+    
+    def get_selected_deck_ids(self):
+        """Get list of currently selected deck IDs"""
+        return self.selected_deck_ids.copy()
 
 
 class CardManagementLayout(QWidget):

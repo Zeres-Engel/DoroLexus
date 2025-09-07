@@ -4,7 +4,7 @@ Stats page wrapper for statistics
 
 from PySide6.QtWidgets import QWidget, QVBoxLayout
 from src.modes.stats_impl import StatsWidget
-from src.ui import StatsPageHeaderLayout
+from src.widgets.nav_bar_widget import NavBarWidget
 
 
 class StatsPage(QWidget):
@@ -21,9 +21,10 @@ class StatsPage(QWidget):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(20)
         
-        # Page header
-        self.header = StatsPageHeaderLayout()
-        layout.addWidget(self.header)
+        # Top navigation bar
+        self.navbar = NavBarWidget("Statistics", show_back_button=False)
+        self.navbar.home_requested.connect(self._navigate_to_home)
+        layout.addWidget(self.navbar)
         
         # Use the existing StatsWidget implementation
         self.stats_widget = StatsWidget(self.db_manager)
@@ -32,3 +33,17 @@ class StatsPage(QWidget):
     def refresh_stats(self):
         """Refresh the statistics"""
         self.stats_widget.refresh_stats()
+        
+    def _navigate_to_home(self):
+        """Navigate to home page through parent window"""
+        try:
+            ancestor = self.parent()
+            max_hops = 5
+            while ancestor and max_hops > 0:
+                if hasattr(ancestor, 'show_home') and callable(getattr(ancestor, 'show_home')):
+                    ancestor.show_home()
+                    return
+                ancestor = ancestor.parent()
+                max_hops -= 1
+        except Exception:
+            pass

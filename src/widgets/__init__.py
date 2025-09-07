@@ -20,6 +20,10 @@ from .button_widget import (
 
 # Flashcard widget
 from .flashcard_widget import FlashcardWidget
+from .homepage_button import HomepageButton
+
+# Responsive deck card widget
+from .responsive_deck_card_widget import ResponsiveDeckCardWidget
 
 __all__ = [
     # Main widgets
@@ -30,5 +34,7 @@ __all__ = [
     'PrimaryButtonWidget', 'DangerButtonWidget', 'IconTextButtonWidget',
     'SecondaryButtonWidget', 'CompactButtonWidget',
     # Existing widgets
-    'FlashcardWidget'
+    'FlashcardWidget', 'HomepageButton',
+    # Responsive widgets
+    'ResponsiveDeckCardWidget'
 ]

@@ -160,10 +160,10 @@ class CosmicParticleSystem(QWidget):
         self.stars: List[CosmicStar] = []
         self.shooting_stars: List[ShootingStar] = []
         
-        # Animation timer
+        # Animation timer - reduced frequency for better performance
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_animation)
-        self.timer.start(50)  # 20 FPS
+        self.timer.start(100)  # 10 FPS - less intensive
         
         # Shooting star timer
         self.shooting_timer = QTimer(self)
@@ -493,6 +493,20 @@ class CosmicParticleSystem(QWidget):
         size = 12
         
         painter.drawEllipse(x - size // 2, y - size // 2, size, size)
+    
+    def pause_animation(self):
+        """Pause the cosmic particle animation"""
+        if self.timer.isActive():
+            self.timer.stop()
+        if self.shooting_timer.isActive():
+            self.shooting_timer.stop()
+    
+    def resume_animation(self):
+        """Resume the cosmic particle animation"""
+        if not self.timer.isActive():
+            self.timer.start(100)
+        if not self.shooting_timer.isActive():
+            self.shooting_timer.start(random.randint(3000, 8000))
     
     def resizeEvent(self, event):
         """Handle resize to update star coordinates"""

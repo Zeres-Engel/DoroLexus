@@ -4,7 +4,8 @@ PreviewDeckPage - a page that shows a deck preview with Q/A table
 
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QScrollArea
 from PySide6.QtCore import Qt
-from src.ui import StudyPageHeaderLayout, PreviewDeckLayout
+from src.ui import PreviewDeckLayout
+from src.widgets.nav_bar_widget import NavBarWidget
 
 
 class PreviewDeckPage(QWidget):
@@ -20,9 +21,11 @@ class PreviewDeckPage(QWidget):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(20)
 
-        self.header = StudyPageHeaderLayout()
-        self.header.back_requested.connect(self._handle_back)
-        layout.addWidget(self.header)
+        # Top navigation bar
+        self.navbar = NavBarWidget("Preview Deck", show_back_button=True)
+        self.navbar.back_requested.connect(self._handle_back)
+        self.navbar.home_requested.connect(self._navigate_to_home)
+        layout.addWidget(self.navbar)
 
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
@@ -49,6 +52,20 @@ class PreviewDeckPage(QWidget):
                     ancestor.show_decks()
                     return
                 ancestor = ancestor.parent()
+        except Exception:
+            pass
+            
+    def _navigate_to_home(self):
+        """Navigate to home page through parent window"""
+        try:
+            ancestor = self.parent()
+            max_hops = 5
+            while ancestor and max_hops > 0:
+                if hasattr(ancestor, 'show_home') and callable(getattr(ancestor, 'show_home')):
+                    ancestor.show_home()
+                    return
+                ancestor = ancestor.parent()
+                max_hops -= 1
         except Exception:
             pass
 
