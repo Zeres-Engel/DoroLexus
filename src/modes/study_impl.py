@@ -14,9 +14,10 @@ from ..widgets import FlashcardWidget
 class StudyMode(QWidget):
     """Widget for studying flashcards with spaced repetition"""
     
-    def __init__(self, db_manager, parent=None):
+    def __init__(self, db_manager, parent=None, show_deck_selector: bool = True):
         super().__init__(parent)
         self.db_manager = db_manager
+        self.show_deck_selector = show_deck_selector
         self.current_deck_id = None
         self.cards_due = []
         self.current_card_index = 0
@@ -42,6 +43,7 @@ class StudyMode(QWidget):
             self.setWindowIcon(QIcon(sword_icon_path))
 
         # Deck selector
+        self.deck_label = QLabel("Study Deck:")
         self.deck_selector = QComboBox()
         self.deck_selector.setStyleSheet("""
             QComboBox {
@@ -56,7 +58,7 @@ class StudyMode(QWidget):
             }
         """)
         self.deck_selector.currentTextChanged.connect(self.on_deck_changed)
-        header_layout.addWidget(QLabel("Study Deck:"))
+        header_layout.addWidget(self.deck_label)
         header_layout.addWidget(self.deck_selector)
         
         header_layout.addStretch()
@@ -67,6 +69,11 @@ class StudyMode(QWidget):
         header_layout.addWidget(self.progress_label)
         
         layout.addLayout(header_layout)
+
+        # Hide deck selector when embedded-controlled
+        if not self.show_deck_selector:
+            self.deck_label.setVisible(False)
+            self.deck_selector.setVisible(False)
         
         # Progress bar
         self.progress_bar = QProgressBar()
@@ -85,8 +92,8 @@ class StudyMode(QWidget):
         self.progress_bar.setVisible(False)
         layout.addWidget(self.progress_bar)
         
-        # Flashcard widget
-        self.flashcard_widget = FlashcardWidget()
+        # Flashcard widget (use side-by-side layout)
+        self.flashcard_widget = FlashcardWidget(side_by_side=True)
         self.flashcard_widget.study_rating.connect(self.on_card_rated)
         layout.addWidget(self.flashcard_widget)
         

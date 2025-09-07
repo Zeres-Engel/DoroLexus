@@ -1,5 +1,6 @@
 """
-Modern deck management page with card-like interface and dark theme
+Decks Management Page - Deck gallery and card management
+Navigation Flow: Home → Deck Gallery → Card Management
 """
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
@@ -16,20 +17,30 @@ import os
 from src.core.paths import asset_path
 
 
-# Card and dialog classes are now imported from src.ui.layout_components
-
-
 class DecksPage(QWidget):
-    """Modern deck management page with card interface"""
+    """
+    Deck management page with clear navigation flow:
+    1. Deck Gallery (create, edit, delete decks)
+    2. Card Management (manage cards within a specific deck)
+    
+    Navigation:
+    - Back from Deck Gallery → Home
+    - Back from Card Management → Deck Gallery
+    """
+    
+    # View States
+    VIEW_DECK_GALLERY = "deck_gallery"
+    VIEW_CARD_MANAGEMENT = "card_management"
     
     deck_selected = Signal(int)  # For studying a deck
     
     def __init__(self, db_manager, parent=None):
         super().__init__(parent)
         self.db_manager = db_manager
-        self.init_ui()
+        self.current_view = self.VIEW_DECK_GALLERY
+        self._init_ui()
         
-    def init_ui(self):
+    def _init_ui(self):
         """Initialize the decks page UI"""
         self.setStyleSheet("""
             DecksPage {
@@ -48,6 +59,7 @@ class DecksPage(QWidget):
         
         # Page header
         self.header = DecksPageHeaderLayout()
+        self.header.back_requested.connect(self.handle_back_navigation)
         layout.addWidget(self.header)
         
         # Create stacked widget for different views
@@ -63,7 +75,6 @@ class DecksPage(QWidget):
         
         # Card management view
         self.card_management = CardManagementLayout()
-        self.card_management.back_to_decks.connect(self.show_deck_gallery)
         self.card_management.add_card.connect(self.add_card)
         self.card_management.edit_card.connect(self.edit_card)
         self.card_management.delete_card.connect(self.delete_card)
@@ -71,14 +82,60 @@ class DecksPage(QWidget):
         
         layout.addWidget(self.stacked_widget)
         
-        # Initially show deck gallery
-        self.show_deck_gallery()
+        # Initialize with deck gallery
+        self._show_deck_gallery()
         
-    def refresh_decks(self):
-        """Refresh the deck gallery"""
+    # ==================== NAVIGATION METHODS ====================
+    
+    def handle_back_navigation(self):
+        """Context-aware back navigation based on current view"""
+        if self.current_view == self.VIEW_CARD_MANAGEMENT:
+            self._navigate_to_deck_gallery()
+        elif self.current_view == self.VIEW_DECK_GALLERY:
+            self._navigate_to_home()
+    
+    def _navigate_to_deck_gallery(self):
+        """Go back to deck gallery"""
+        self._show_deck_gallery()
+    
+    def _navigate_to_home(self):
+        """Navigate to home page through parent window"""
+        try:
+            ancestor = self.parent()
+            max_hops = 5
+            while ancestor and max_hops > 0:
+                if hasattr(ancestor, 'show_home') and callable(getattr(ancestor, 'show_home')):
+                    ancestor.show_home()
+                    return
+                ancestor = ancestor.parent()
+                max_hops -= 1
+        except Exception:
+            pass
+    
+    # ==================== VIEW METHODS ====================
+    
+    def _show_deck_gallery(self):
+        """Show deck gallery view"""
+        self.current_view = self.VIEW_DECK_GALLERY
+        self.stacked_widget.setCurrentWidget(self.deck_gallery)
+        self._refresh_decks()
+    
+    def _show_card_management(self, deck_id, deck_name):
+        """Show card management view for specific deck"""
+        self.current_view = self.VIEW_CARD_MANAGEMENT
+        self.card_management.set_deck(deck_id, deck_name)
+        self.card_management.refresh_cards(self.db_manager.get_cards_in_deck(deck_id))
+        self.stacked_widget.setCurrentWidget(self.card_management)
+    
+    # ==================== DATA METHODS ====================
+    
+    def _refresh_decks(self):
+        """Load and refresh deck gallery"""
         decks = self.db_manager.get_all_decks()
         self.deck_gallery.refresh_decks(decks)
         
+    # ==================== EVENT HANDLERS ====================
+    
     def create_deck(self):
         """Create a new deck"""
         dialog = DeckDialogLayout(parent=self)
@@ -90,18 +147,16 @@ class DecksPage(QWidget):
                 
             try:
                 self.db_manager.create_deck(deck_data['name'], deck_data['description'])
-                self.refresh_decks()
+                self._refresh_decks()
                 QMessageBox.information(self, "Success", "Deck created successfully!")
             except ValueError as e:
                 QMessageBox.warning(self, "Error", str(e))
                 
     def edit_deck(self, deck_id):
-        """Edit deck or manage its cards"""
+        """Edit deck - navigate to card management"""
         deck = self.db_manager.get_deck(deck_id)
         if deck:
-            self.card_management.set_deck(deck_id, deck['name'])
-            self.card_management.refresh_cards(self.db_manager.get_cards_in_deck(deck_id))
-            self.stacked_widget.setCurrentWidget(self.card_management)
+            self._show_card_management(deck_id, deck['name'])
             
     def add_card(self):
         """Add a new card"""
@@ -164,10 +219,11 @@ class DecksPage(QWidget):
         
         if reply == QMessageBox.Yes:
             self.db_manager.delete_deck(deck_id)
-            self.refresh_decks()
+            self._refresh_decks()
             QMessageBox.information(self, "Success", "Deck deleted successfully!")
-            
-    def show_deck_gallery(self):
-        """Show the deck gallery view"""
-        self.stacked_widget.setCurrentWidget(self.deck_gallery)
-        self.refresh_decks()
+    
+    # ==================== PUBLIC API ====================
+    
+    def refresh_decks(self):
+        """Public API: Refresh deck gallery (called by main window)"""
+        self._refresh_decks()

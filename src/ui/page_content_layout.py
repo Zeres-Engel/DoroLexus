@@ -3,7 +3,8 @@ Page Content Layout Components
 """
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
-                               QScrollArea, QGridLayout, QListWidget, QListWidgetItem)
+                               QScrollArea, QGridLayout, QListWidget, QListWidgetItem,
+                               QTableWidget, QTableWidgetItem)
 from PySide6.QtCore import Qt, Signal
 from ..widgets.button_widget import PrimaryButtonWidget, DangerButtonWidget
 
@@ -239,7 +240,6 @@ class StudyDeckSelectionLayout(QWidget):
 class CardManagementLayout(QWidget):
     """Layout for managing cards within a deck"""
     
-    back_to_decks = Signal()
     add_card = Signal()
     edit_card = Signal(int)
     delete_card = Signal(int)
@@ -284,15 +284,9 @@ class CardManagementLayout(QWidget):
         # Header
         header_layout = QHBoxLayout()
         
-        # Back button
-        back_btn = PrimaryButtonWidget("← Back to Decks")
-        back_btn.clicked.connect(self.back_to_decks.emit)
-        header_layout.addWidget(back_btn)
-        
-        header_layout.addStretch()
-        
-        # Deck title
+        # Deck title (centered)
         self.deck_title = QLabel()
+        self.deck_title.setAlignment(Qt.AlignCenter)
         self.deck_title.setStyleSheet("""
             QLabel {
                 color: white;
@@ -358,3 +352,77 @@ class CardManagementLayout(QWidget):
         if current_item:
             return current_item.data(Qt.UserRole)
         return None
+
+
+class ReviewTableLayout(QWidget):
+    """Simple two-column table to preview cards before studying"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.init_ui()
+        
+    def init_ui(self):
+        self.setStyleSheet("""
+            ReviewTableLayout {
+                background: transparent;
+                color: white;
+            }
+            QTableWidget {
+                background-color: #2d2d2d;
+                border: 2px solid #444;
+                border-radius: 8px;
+                gridline-color: #555;
+                color: white;
+                font-size: 14px;
+                font-family: "Cascadia Code", "Cascadia Mono", "Fira Code", "Consolas", "Courier New", monospace;
+            }
+            QHeaderView::section {
+                background-color: #383838;
+                color: white;
+                padding: 6px 10px;
+                border: none;
+            }
+            QTableWidget::item {
+                padding: 8px;
+            }
+        """)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 0, 20, 0)
+        layout.setSpacing(10)
+        
+        title = QLabel("Review Cards")
+        title.setAlignment(Qt.AlignLeft)
+        title.setStyleSheet("""
+            QLabel {
+                color: white;
+                font-size: 18px;
+                font-weight: bold;
+                background: transparent;
+                margin: 6px 0px;
+                font-family: "Cascadia Code", "Cascadia Mono", "Fira Code", "Consolas", "Courier New", monospace;
+            }
+        """)
+        layout.addWidget(title)
+        
+        self.table = QTableWidget(0, 2)
+        self.table.setHorizontalHeaderLabels(["Question", "Answer"])
+        self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.horizontalHeader().setDefaultSectionSize(400)
+        self.table.verticalHeader().setVisible(False)
+        self.table.setWordWrap(True)
+        self.table.setShowGrid(True)
+        layout.addWidget(self.table)
+        
+    def set_cards(self, cards):
+        """Populate table rows with list of {front, back}"""
+        self.table.setRowCount(0)
+        if not cards:
+            return
+        self.table.setRowCount(len(cards))
+        for row, card in enumerate(cards):
+            q_item = QTableWidgetItem(card.get('front', ''))
+            a_item = QTableWidgetItem(card.get('back', ''))
+            q_item.setFlags(q_item.flags() ^ Qt.ItemIsEditable)
+            a_item.setFlags(a_item.flags() ^ Qt.ItemIsEditable)
+            self.table.setItem(row, 0, q_item)
+            self.table.setItem(row, 1, a_item)

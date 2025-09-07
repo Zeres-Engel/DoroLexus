@@ -15,17 +15,18 @@ class FlashcardWidget(QWidget):
     card_flipped = Signal(bool)  # True when showing back, False when showing front
     study_rating = Signal(int)   # Rating from 0-5 for spaced repetition
     
-    def __init__(self, front_text: str = "", back_text: str = "", parent=None):
+    def __init__(self, front_text: str = "", back_text: str = "", parent=None, side_by_side: bool = False):
         super().__init__(parent)
         self.front_text = front_text
         self.back_text = back_text
         self.is_flipped = False
+        self.side_by_side = side_by_side
         self.init_ui()
         self.setup_animations()
         
     def init_ui(self):
         """Initialize the flashcard UI"""
-        self.setFixedSize(600, 400)
+        self.setFixedSize(800 if self.side_by_side else 600, 400)
         self.setStyleSheet("""
             QWidget {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
@@ -57,7 +58,7 @@ class FlashcardWidget(QWidget):
         content_layout = QVBoxLayout(self.content_frame)
         content_layout.setContentsMargins(20, 20, 20, 20)
         
-        # Card text
+        # Single label view
         self.card_label = QLabel()
         self.card_label.setAlignment(Qt.AlignCenter)
         self.card_label.setWordWrap(True)
@@ -72,6 +73,52 @@ class FlashcardWidget(QWidget):
             }
         """)
         content_layout.addWidget(self.card_label)
+        
+        # Side-by-side view container
+        self.two_col_container = QWidget()
+        two_col_layout = QHBoxLayout(self.two_col_container)
+        two_col_layout.setContentsMargins(0, 0, 0, 0)
+        two_col_layout.setSpacing(12)
+        
+        def build_pane(title: str) -> QVBoxLayout:
+            pane = QFrame()
+            pane.setStyleSheet("""
+                QFrame {
+                    background: rgba(30, 30, 30, 0.6);
+                    border: 1px solid rgba(255, 255, 255, 0.1);
+                    border-radius: 8px;
+                }
+            """)
+            pane_layout = QVBoxLayout(pane)
+            pane_layout.setContentsMargins(12, 12, 12, 12)
+            title_label = QLabel(title)
+            title_label.setAlignment(Qt.AlignLeft)
+            title_label.setStyleSheet("""
+                QLabel {
+                    color: rgba(255,255,255,0.7);
+                    font-size: 12px;
+                    font-weight: bold;
+                    background: transparent;
+                    font-family: "Cascadia Code", "Cascadia Mono", "Fira Code", "Consolas", "Courier New", monospace;
+                }
+            """)
+            pane_layout.addWidget(title_label)
+            return pane, pane_layout
+        
+        self.left_pane, self.left_layout = build_pane("Question")
+        self.right_pane, self.right_layout = build_pane("Answer")
+        
+        self.left_label = QLabel()
+        self.left_label.setWordWrap(True)
+        self.left_label.setStyleSheet(self.card_label.styleSheet())
+        self.right_label = QLabel()
+        self.right_label.setWordWrap(True)
+        self.right_label.setStyleSheet(self.card_label.styleSheet())
+        self.left_layout.addWidget(self.left_label)
+        self.right_layout.addWidget(self.right_label)
+        two_col_layout.addWidget(self.left_pane)
+        two_col_layout.addWidget(self.right_pane)
+        content_layout.addWidget(self.two_col_container)
         
         layout.addWidget(self.content_frame)
         
@@ -175,18 +222,40 @@ class FlashcardWidget(QWidget):
         self.is_flipped = False
         self.update_content()
         self.reset_ui_state()
+
+    def set_side_by_side(self, enabled: bool):
+        """Toggle side-by-side display mode"""
+        self.side_by_side = enabled
+        self.setFixedSize(800 if self.side_by_side else 600, 400)
+        self.update_content()
+        # In side-by-side view, show ratings immediately and hide flip
+        self.rating_container.setVisible(self.side_by_side)
+        self.flip_button.setVisible(not self.side_by_side)
         
     def update_content(self):
         """Update the displayed content based on flip state"""
-        if self.is_flipped:
-            self.card_label.setText(self.back_text)
-            self.flip_button.setText("Show Question")
-        else:
-            self.card_label.setText(self.front_text)
+        if self.side_by_side:
+            # Show both columns
+            self.card_label.setVisible(False)
+            self.two_col_container.setVisible(True)
+            self.left_label.setText(self.front_text)
+            self.right_label.setText(self.back_text)
             self.flip_button.setText("Show Answer")
+        else:
+            # Single label with flip behavior
+            self.card_label.setVisible(True)
+            self.two_col_container.setVisible(False)
+            if self.is_flipped:
+                self.card_label.setText(self.back_text)
+                self.flip_button.setText("Show Question")
+            else:
+                self.card_label.setText(self.front_text)
+                self.flip_button.setText("Show Answer")
             
     def flip_card(self):
         """Flip the card to show front or back"""
+        if self.side_by_side:
+            return
         self.is_flipped = not self.is_flipped
         self.update_content()
         self.card_flipped.emit(self.is_flipped)
@@ -208,8 +277,12 @@ class FlashcardWidget(QWidget):
         """Reset UI to initial state"""
         self.is_flipped = False
         self.update_content()
-        self.rating_container.setVisible(False)
-        self.flip_button.setVisible(True)
+        if self.side_by_side:
+            self.rating_container.setVisible(True)
+            self.flip_button.setVisible(False)
+        else:
+            self.rating_container.setVisible(False)
+            self.flip_button.setVisible(True)
         
     def paintEvent(self, event):
         """Custom paint event for card styling"""

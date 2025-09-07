@@ -127,7 +127,7 @@ class DoroLexusApp(QMainWindow):
         # Back button
         self.back_button = PrimaryButton("← Back")
         self.back_button.setFixedSize(100, 40)
-        self.back_button.clicked.connect(self.show_home)
+        self.back_button.clicked.connect(self.on_back_clicked)
         self.back_button.setVisible(False)
         header_layout.addWidget(self.back_button)
 
@@ -274,6 +274,19 @@ class DoroLexusApp(QMainWindow):
         """Handle deck selection"""
         self.current_deck = deck_id
         self.study_page.set_current_deck(deck_id)
+
+    def on_back_clicked(self):
+        """Context-aware back navigation.
+        If current page provides a back handler, delegate to it. Otherwise, go home.
+        """
+        current = self.stacked_widget.currentWidget()
+        try:
+            if current and hasattr(current, 'handle_back_navigation') and callable(getattr(current, 'handle_back_navigation')):
+                current.handle_back_navigation()
+                return
+        except Exception:
+            pass
+        self.show_home()
         
     def resizeEvent(self, event):
         """Handle window resize"""
